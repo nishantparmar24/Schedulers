@@ -1,1 +1,1 @@
-ielts_timer: python aps_test.py
+timer: python aps_test.py
