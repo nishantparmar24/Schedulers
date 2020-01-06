@@ -1,8 +1,9 @@
-from apscheduler.schedulers.blocking import BlockingScheduler
+# from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime as dt
-from timer_test import time_format
+from Timer.timer_test import time_format
 
-sched = BlockingScheduler()
+sched = BackgroundScheduler()
 
 
 @sched.scheduled_job('interval', seconds=1)
@@ -11,11 +12,13 @@ def timer():
     time_diff = target_date - dt.now()
     print("{}".format(dt.now().replace(microsecond=0)))
     components = time_format(time_diff)
-    print("Time left: {} days : {} h : {} m : {} s".format(
+    msg = "Time left: {} days : {} h : {} m : {} s".format(
         components["days"],
         components["hours"],
         components["minutes"],
-        components["seconds"]))
+        components["seconds"])
+    print(msg)
+    return msg
 
 
 sched.start()
