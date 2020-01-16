@@ -1,13 +1,12 @@
-
-import re
-import pandas as pd
-import pickle
-import os
 from apiclient import errors
 from datetime import datetime as dt
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+import os
+import pandas as pd
+import pickle
+import re
 
 SCOPES = [
     'https://www.googleapis.com/auth/drive',
@@ -33,15 +32,18 @@ def test_drive():
             pickle.dump(creds, token)
     drive_service = build('drive', 'v3', credentials=creds)
     sheets_service = build('sheets', 'v4', credentials=creds)
-    return drive_service, sheets_service
+    return {"drive": drive_service, "sheets": sheets_service}
 
 
-def get_inputs_id(service, folder_id):
+def get_inputs_id(service, folder_id, only_folders=False):
     folders_mime = "mimeType='application/vnd.google-apps.folder'"
-    folders_query = "{} and '{}' in parents".format(folders_mime, folder_id)
+    if only_folders:
+        query = "{} and '{}' in parents".format(folders_mime, folder_id)
+    else:
+        query = "'{}' in parents".format(folder_id)
     try:
         resp_all_folders = service.files().list(
-            q=folders_query).execute()
+            q=query).execute()
         all_files = resp_all_folders.get('files', [])
         if len(all_files) == 0:
             return None
@@ -102,43 +104,6 @@ def get_folder(folder_name, drive_service):
         return {"parent_id": None, "children": None}
 
 
-def check_file_temp(folder_name, file_name, file_type, service):
-    folder_object = None
-    if file_type.strip() == "spreadsheet":
-        match = False
-        print(folder_name)
-        if folder_name:
-            folder_object = get_folder(folder_name, service)
-            for sub_folder in folder_object["children"]:
-                print("Sub Folder: {}".format(sub_folder["name"]))
-                if file_name == sub_folder["name"]:
-                    print("Match of the file was found!")
-                    match = True
-                    break
-        if not match:
-            mime_type = "mimeType='application/vnd.google-apps.spreadsheet'"
-            if folder_object:
-                query_str = "name = '{name}' and {mime} and '{pid}' in parents"
-                query = query_str.format(name=file_name,
-                                         mime=mime_type,
-                                         pid=folder_object["parent_id"])
-            else:
-                query_str = "name = '{name}' and {mime}"
-                query = query_str.format(name=file_name,
-                                         mime=mime_type)
-            response = service.files().list(q=query,
-                                            fields="files(id, name)").execute()
-            items = get_folder_id(response, service, check_parents=False)
-            s = "{} {} found"
-            if items:
-                print(items)
-                n = len(items)
-                msg = s.format(n, "files") if n > 1 else s.format(n, "file")
-            else:
-                msg = s.format(0, "files")
-        return match, msg
-
-
 def check_file(folder_id, file_name, file_type, service):
     if file_type.strip() == "spreadsheet":
         match = False
@@ -197,8 +162,9 @@ def move_file(file_id, target_id, service):
         return None
 
 
-def create_spreadsheet(title, data_df, drive, sheets, folder_id=None):
+def create_spreadsheet(title, data_df, services, folder_id=None):
     if not data_df.empty:
+        drive, sheets = services["drive"], services["sheets"]
         pre_exists, msg_ = check_file(folder_id, title, "spreadsheet", drive)
         if pre_exists:
             print(msg_)
@@ -242,37 +208,51 @@ def create_spreadsheet(title, data_df, drive, sheets, folder_id=None):
             return None
 
 
-def process_geo_specific_data(target_folder, drive, sheets, folders_object):
+def process_geo_specific_data(data_df, target_folder, services, folders_object):
     print(target_folder)
     if check_internal_folder(folders_object["children"], target_folder):
-        geo_folders_ = get_folder(target_folder, drive_)
+        geo_folders_ = get_folder(target_folder, services["drive"])
         print(geo_folders_)
         folder_id = geo_folders_["parent_id"]
-        data_ = [{"a": 90, "b": 80}, {"a": 110, "b": 770}]
-        df_ = pd.DataFrame(data_, columns=["a", "b"])
-        print(df_)
-        formatter = lambda s: "0{}".format(s) if int(s) < 10 else "{}".format(s)
-        date_today = "{year}-{month}-{day}".format(
-            year=dt.now().year, month=formatter(dt.now().month),
-            day=formatter(dt.now().day))
+        # data_ = [{"a": 90, "b": 80}, {"a": 110, "b": 770}]
+        # df_ = pd.DataFrame(data_, columns=["a", "b"])
+        # print(df_)
+        # formatter = lambda s: "0{}".format(s) if \
+        # int(s) < 10 else "{}".format(s)
+        # date_today = "{year}-{month}-{day}".format(
+        #     year=dt.now().year, month=formatter(dt.now().month),
+        #     day=formatter(dt.now().day))
         prefix_ = "Data-Collection"
         suffix_ = "v0"
         if target_folder == "it-it":
             prefix_ = "Italy-Collection"
-        spreadsheet_name = "{}-{}-{}".format(prefix_, date_today, suffix_)
+        # spreadsheet_name = "{}-{}-{}".format(prefix_, date_today, suffix_)
+        spreadsheet_name = "{}-{}".format(prefix_, suffix_)
         print("\nSpreadsheet-name: {}\n".format(spreadsheet_name))
         create_sheet_response = create_spreadsheet(title=spreadsheet_name,
-                                                   data_df=df_,
-                                                   drive=drive,
-                                                   sheets=sheets,
+                                                   data_df=data_df,
+                                                   services=services,
                                                    folder_id=folder_id)
         print("Response: \n'{}'".format(create_sheet_response))
+    else:
+        print("Parent folder does not match with the target folder")
 
 
+# """
 if __name__ == "__main__":
-    drive_, sheets_ = test_drive()
-    internal_folders = get_folder("Test Data", drive_)
+    services_ = test_drive()
+    internal_folders = get_folder("Test Data", services_["drive"])
     if internal_folders["children"]:
-        print(internal_folders)
-        process_geo_specific_data("it-it", drive_, sheets_, internal_folders)
+        # print(internal_folders)
+        files = [f for f in internal_folders["children"] if
+                 f["mimeType"] != "application/vnd.google-apps.folder"]
+        print(files)
+        # for files in internal_folders["children"]:
+        #     if files["mimeType"] != "application/vnd.google-apps.folder":
+        #         print("{}:".format(files["name"]))
+        process_geo_specific_data("it-it", services_["drive"],
+                                  services_["sheets"], internal_folders)
+    else:
+        print("No folder with the name Test Data found")
 
+# """
