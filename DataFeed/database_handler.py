@@ -84,7 +84,7 @@ def dataframe_to_table(dataframe, table_name):
     if not equality:
         combined_df = table_values.append(dataframe, ignore_index=True,
                                           sort=False)
-        col_subset = ["search_query", "user", "title", "link", "sector"]
+        col_subset = ["text_data"]
         combined_df.drop_duplicates(subset=col_subset, inplace=True)
     try:
         if not combined_df.empty:

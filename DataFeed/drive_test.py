@@ -3,6 +3,7 @@ from datetime import datetime as dt
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from constants import GOOGLE_MIME_TYPES
 import os
 import pandas as pd
 import pickle
@@ -36,7 +37,7 @@ def test_drive():
 
 
 def get_inputs_id(service, folder_id, only_folders=False):
-    folders_mime = "mimeType='application/vnd.google-apps.folder'"
+    folders_mime = "mimeType='{}'".format(GOOGLE_MIME_TYPES["folder"])
     if only_folders:
         query = "{} and '{}' in parents".format(folders_mime, folder_id)
     else:
@@ -81,7 +82,7 @@ def get_folder_id(resultset, service_object, check_parents=True):
 
 
 def get_folder(folder_name, drive_service):
-    folder_condition = "mimeType='application/vnd.google-apps.folder'"
+    folder_condition = "mimeType='{}'".format(GOOGLE_MIME_TYPES["folder"])
     folder_query = "name = '{q}' and {t}".format(q=folder_name,
                                                  t=folder_condition)
     print(folder_query)
@@ -93,47 +94,49 @@ def get_folder(folder_name, drive_service):
             inputs_file_id = get_inputs_id(drive_service, folder_id)
             # print(inputs_file_id)
             if inputs_file_id:
-                return {"parent_id": folder_id, "children": inputs_file_id}
+                return {"self_id": folder_id, "children": inputs_file_id}
             else:
-                return {"parent_id": folder_id, "children": None}
+                return {"self_id": folder_id, "children": None}
         else:
             print("No Folder found!")
-            return {"parent_id": None, "children": None}
+            return {"self_id": None, "children": None}
     except errors.HttpError as error:
         print("ERROR in handle_inputs: {}".format(error))
-        return {"parent_id": None, "children": None}
+        return {"self_id": None, "children": None}
 
 
-def check_file(folder_id, file_name, file_type, service):
+def check_file(parent_folder_id, file_name, file_type, service):
+    match = False
     if file_type.strip() == "spreadsheet":
-        match = False
-        mime_type = "mimeType='application/vnd.google-apps.spreadsheet'"
-        if folder_id:
-            query_str = "name = '{name}' and {mime} and '{pid}' in parents"
-            query = query_str.format(name=file_name,
-                                     mime=mime_type,
-                                     pid=folder_id)
+        mime_type = "mimeType='{}'".format(GOOGLE_MIME_TYPES["spreadsheet"])
+    elif file_type.strip() == "folder":
+        mime_type = "mimeType='{}'".format(GOOGLE_MIME_TYPES["folder"])
+    if parent_folder_id:
+        query_str = "name = '{name}' and {mime} and '{pid}' in parents"
+        query = query_str.format(name=file_name,
+                                 mime=mime_type,
+                                 pid=parent_folder_id)
+    else:
+        query_str = "name = '{name}' and {mime}"
+        query = query_str.format(name=file_name,
+                                 mime=mime_type)
+    try:
+        print("\ncheck-file-query: {}".format(query))
+        response = service.files().list(q=query,
+                                        fields="files(id, name)").execute()
+        items = get_folder_id(response, service, check_parents=False)
+        s = "{} {} found"
+        if items:
+            print(items)
+            n = len(items)
+            msg = s.format(n, "files") if n > 1 else s.format(n, "file")
+            match = True
         else:
-            query_str = "name = '{name}' and {mime}"
-            query = query_str.format(name=file_name,
-                                     mime=mime_type)
-        try:
-            print("\ncheck-file-query: {}".format(query))
-            response = service.files().list(q=query,
-                                            fields="files(id, name)").execute()
-            items = get_folder_id(response, service, check_parents=False)
-            s = "{} {} found"
-            if items:
-                print(items)
-                n = len(items)
-                msg = s.format(n, "files") if n > 1 else s.format(n, "file")
-                match = True
-            else:
-                msg = s.format(0, "files")
-            return match, msg
-        except errors.HttpError as error:
-            msg = "ERROR in handle_inputs: {}".format(error)
-            return False, msg
+            msg = s.format(0, "files")
+        return match, msg
+    except errors.HttpError as error:
+        msg = "ERROR in handle_inputs: {}".format(error)
+        return False, msg
 
 
 def check_internal_folder(folders, name):
@@ -211,17 +214,9 @@ def create_spreadsheet(title, data_df, services, folder_id=None):
 def process_geo_specific_data(data_df, target_folder, services, folders_object):
     print(target_folder)
     if check_internal_folder(folders_object["children"], target_folder):
-        geo_folders_ = get_folder(target_folder, services["drive"])
-        print(geo_folders_)
-        folder_id = geo_folders_["parent_id"]
-        # data_ = [{"a": 90, "b": 80}, {"a": 110, "b": 770}]
-        # df_ = pd.DataFrame(data_, columns=["a", "b"])
-        # print(df_)
-        # formatter = lambda s: "0{}".format(s) if \
-        # int(s) < 10 else "{}".format(s)
-        # date_today = "{year}-{month}-{day}".format(
-        #     year=dt.now().year, month=formatter(dt.now().month),
-        #     day=formatter(dt.now().day))
+        geo_folders = get_folder(target_folder, services["drive"])
+        print(geo_folders)
+        folder_id = geo_folders["self_id"]
         prefix_ = "Data-Collection"
         suffix_ = "v0"
         if target_folder == "it-it":
@@ -238,7 +233,43 @@ def process_geo_specific_data(data_df, target_folder, services, folders_object):
         print("Parent folder does not match with the target folder")
 
 
-# """
+def create_folder(folder_name, target_folder, drive_service):
+    new_folder_id, create_folder_response = None, None
+    print("Creating Folder '{}' inside '{}'".format(folder_name, target_folder))
+    selected_folders = get_folder(target_folder, drive_service)
+    print(selected_folders)
+    parent_folder_id = selected_folders["self_id"]
+    try:
+        folder_metadata = {
+            "name": folder_name,
+            "mimeType": GOOGLE_MIME_TYPES["folder"],
+            "parents": [parent_folder_id]
+        }
+        if parent_folder_id:
+            print("\tSelf ID of Parent Folder: '{}'".format(parent_folder_id))
+            folder_exists, msg = check_file(parent_folder_id=parent_folder_id,
+                                            file_name=folder_name,
+                                            file_type="folder",
+                                            service=drive_service)
+            print("{}: {}".format(msg, folder_exists))
+            if not folder_exists:
+                create_folder_response = drive_service.files().create(
+                    body=folder_metadata).execute()
+        else:
+            print("\tCould not trace Parent Folder ID.")
+            _ = folder_metadata.pop("parents")
+            create_folder_response = drive_service.files().create(
+                body=folder_metadata).execute()
+        if create_folder_response:
+            print(create_folder_response)
+            new_folder_id = create_folder_response.get("id")
+
+    except errors.HttpError as e:
+        print("\nERROR: Folder couldn't be created because:\n{}".format(e))
+    return new_folder_id
+
+
+"""
 if __name__ == "__main__":
     services_ = test_drive()
     internal_folders = get_folder("Test Data", services_["drive"])
@@ -255,4 +286,4 @@ if __name__ == "__main__":
     else:
         print("No folder with the name Test Data found")
 
-# """
+"""

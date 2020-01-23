@@ -27,10 +27,18 @@ NEWS_SOURCES = ",".join(["reuters", "ansa", "google-news-it"])
 BERT_MODEL = {
     "endpoint_uri": "http://ac6a2064dee3c11e99ced0a13821e56d-733867741.ap"
                     "-southeast-1.elb.amazonaws.com/sentiment/classifier",
-    "headers": {"content-type": "application/json"}
+    "headers": {
+        "content-type": "application/json"
+    }
 }
+
 USERNAME = "root"
 PASSWORD = "Gradient8#"
 HOST = "127.0.0.1"
 PORT = "3306"
 SCHEMA = "search_automation"
+
+GOOGLE_MIME_TYPES = {
+    "spreadsheet": "application/vnd.google-apps.spreadsheet",
+    "folder": "application/vnd.google-apps.folder"
+}

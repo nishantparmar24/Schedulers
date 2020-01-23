@@ -283,13 +283,13 @@ def news_api_auth():
     src_ = os.path.join(os.getcwd(), "Credentials", "news_api_key.json")
     with open(os.path.join(src_, "news_api_key.json")) as key:
         obj = json.load(key)
-        return obj["api_key"]
+        if "api_key" in obj.keys() and obj["api_key"]:
+            return NewsApiClient(api_key=obj["api_key"])
+        else:
+            return None
 
 
-# newsapi = NewsApiClient(api_key=get_api_key())
-
-
-def get_news(news_api, queries, sources, page_size=100, **kwargs):
+def get_news(queries, sources, news_api, page_size=100, **kwargs):
     """Fetch News Headlines using the News API"""
     top_headlines_map = dict()
     # saved_files = list()
@@ -431,7 +431,7 @@ def get_saved_versions(name, location):
         return pd.DataFrame()
 
 
-def save_output_version(data, name, location, version=None):
+def save_output_version(data, name, location, version=None, to_database=False):
     filename_format = "{name}-{version}.csv"
     next_version = int(version) if version else 1
     all_versions = get_saved_versions(name, location)
@@ -631,7 +631,7 @@ def get_prev_files(twitter_output, news_output, search_output):
                         prev_files[os.path.join(directory, part)] = source
         elif os.path.isfile(directory):
             if re.search(r".*\.csv$", directory) \
-                    and directory not in prev_files.keys():
+                    and directory not in prev_files.save_output_versionkeys():
                 prev_files[directory] = source
 
     for directory_, column_ in dir_col_map.items():
