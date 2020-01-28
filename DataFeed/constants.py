@@ -4,8 +4,23 @@ TWITTER_PARAMS = {
     "IT_QUERY_FILTER": "-has:media place_country:IT",
     "IT_EN_QUERY_FILTER": "-has:media place_country:IT lang:en",
     "GENERIC_QUERY_FILTER": "-has:media",
-    "RESULTS_PER_CALL": 1,  # 100,
-    "MAX_RESULTS": 1  # 100
+    "RESULTS_PER_CALL": 10,  # 100,
+    "MAX_RESULTS": 10,  # 100
+}
+
+TWITTER_COLS_MAP = {
+    "text": "text_data",
+    "links": "source_links",
+    "handles": "source_writers",
+    "tags": "text_tags",
+    "created_time": "source_date"
+}
+
+NEWS_COLS_MAP = {
+    "description": "text_data",
+    "url": "source_links",
+    "publishedAt": "source_date",
+    "source": "source_writers"
 }
 
 NEWS_PARAMS = {
@@ -37,6 +52,7 @@ PASSWORD = "Gradient8#"
 HOST = "127.0.0.1"
 PORT = "3306"
 SCHEMA = "search_automation"
+TABLE = "text_data_reserve"
 
 GOOGLE_MIME_TYPES = {
     "spreadsheet": "application/vnd.google-apps.spreadsheet",

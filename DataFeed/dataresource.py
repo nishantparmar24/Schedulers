@@ -121,19 +121,33 @@ def format_date_str(date_string):
     if int(date_string) < 10:
         return "0{}".format(date_string)
     else:
-        "{}".format(date_string)
+        return "{}".format(date_string)
 
 
-def today():
+def today(purpose="file"):
     """
     Function to return a formatting of current datetime (for file names)
+
+    :param purpose: a string value corresponding to the usage of the date-string
     :return: string
     """
-    return "{}-{}-{}_{}-{}".format(dt.now().year,
-                                   format_date_str(dt.now().month),
-                                   format_date_str(dt.now().day),
-                                   format_date_str(dt.now().hour),
-                                   format_date_str(dt.now().minute))
+    string_format = output_string = ""
+    if purpose == "file":
+        string_format = "{}-{}-{}_{}-{}"
+        output_string = string_format.format(dt.now().year,
+                                             format_date_str(dt.now().month),
+                                             format_date_str(dt.now().day),
+                                             format_date_str(dt.now().hour),
+                                             format_date_str(dt.now().minute))
+    elif purpose == "datetime":
+        string_format = "{}-{}-{} {}:{}:{}"
+        output_string = string_format.format(dt.now().year,
+                                             format_date_str(dt.now().month),
+                                             format_date_str(dt.now().day),
+                                             format_date_str(dt.now().hour),
+                                             format_date_str(dt.now().minute),
+                                             format_date_str(dt.now().second))
+    return output_string
 
 
 def get_month_days_map(year, month=None):
@@ -281,7 +295,7 @@ def update_news_api_usage(date):
 def news_api_auth():
     """Fetch NewsAPI Credentials"""
     src_ = os.path.join(os.getcwd(), "Credentials", "news_api_key.json")
-    with open(os.path.join(src_, "news_api_key.json")) as key:
+    with open(src_) as key:
         obj = json.load(key)
         if "api_key" in obj.keys() and obj["api_key"]:
             return NewsApiClient(api_key=obj["api_key"])
@@ -313,8 +327,9 @@ def get_news(queries, sources, news_api, page_size=100, **kwargs):
             data_df = pd.DataFrame(data=collection)
             if not data_df.empty:
                 match_str = "({})".format(query)
-                reqd_df = data_df[data_df["description"].str.contains(
-                    match_str)]
+                reqd_df = data_df
+                # reqd_df = data_df[data_df["description"].str.contains(
+                #     match_str)]
                 if news_collection.empty:
                     news_collection = reqd_df
                 else:
@@ -365,7 +380,7 @@ def get_tweets(query_set, twitter_args, query_filter=None):
             tweets = collect_results(rule,
                                      max_results=params["MAX_RESULTS"],
                                      result_stream_args=twitter_args)
-            print(len(tweets))
+            print("number of tweets: {}".format(len(tweets)))
             update_twitter_api_usage(curr_month, len(tweets))
             tweets_list.append(tweets)
 
@@ -492,8 +507,6 @@ def get_fresh_data(tweets, headlines, tweets_output, news_output):
         processed_tweets = process_tweets(tweets)
         processed_tweets = processed_tweets.reset_index().drop(
             columns=['index'])
-        print("processed_tweets")
-        print(processed_tweets.columns)
         duplicacy_subset = list(
             set(processed_tweets.columns) - {"created_time"})
         processed_tweets.drop_duplicates(subset=duplicacy_subset, inplace=True)
@@ -507,8 +520,6 @@ def get_fresh_data(tweets, headlines, tweets_output, news_output):
         news_collection.to_csv(
             os.path.join(news_output, "news_{}.csv".format(today())),
             index=False)
-        print("news_collection")
-        print(news_collection.columns)
     fresh_data["tweets"] = processed_tweets
     fresh_data["headlines"] = news_collection
     return fresh_data
@@ -638,8 +649,3 @@ def get_prev_files(twitter_output, news_output, search_output):
         extract_csv_files(directory_, column_)
 
     return prev_files
-
-
-# if __name__ == "__main__":
-#     result = get_saved_versions("Italy-Collection", "it-it")
-#     print(result)
