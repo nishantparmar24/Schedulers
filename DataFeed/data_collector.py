@@ -20,6 +20,11 @@ def reorder_columns(data_frame):
     return db_match_dataframe
 
 
+def csv_to_db(file_name):
+    output_df = pd.read_csv(file_name)
+    db.dataframe_to_table(output_df)
+
+
 class DataCollector(object):
     def __init__(self):
         self.collected_data = DataFrame()
@@ -75,40 +80,19 @@ class DataCollector(object):
                                                              ignore_index=True)
 
 
-def test_df_to_db():
-    data_ = [
-        {
-            "text_tags": "Not an election in sight",
-            "record_created_date": "2020-01-28 16:29:00"
-        },
-        {
-            "text_tags": "Jole Santelli trionfa in Calabria e diventa la",
-            "record_created_date": "2020-01-28 16:30:56"
-        },
-        {
-            "text_tags": "VLBJKSCBJSHCBJHHJDGVFGHCHJS",
-            "record_created_date": "2020-01-28 16:30:59"
-        },
-    ]
-    df_ = DataFrame(data_, columns=["text_tags", "record_created_date"])
-    db.dataframe_to_table(dataframe=df_, table_name="test_text_data_reserve")
-
-
-def csv_to_db():
-    output_df = pd.read_csv("Outputs.csv")
-    db.dataframe_to_table(output_df)
-
-
 if __name__ == "__main__":
     collection_object = DataCollector()
     try:
         for loc in ["en-it", "it-it"]:
             collection_object.collect_tweets(locale=loc)
             collection_object.collect_news(locale=loc)
-        collection_object.collected_data.drop_duplicates(subset=["text_data"],
-                                                         inplace=True)
-        if not collection_object.collected_data.empty:
+        final_df = collection_object.collected_data.copy()
+        final_df.drop_duplicates(subset=["text_data"], inplace=True)
+        if not final_df.empty:
+            final_df["source_date"] = pd.to_datetime(final_df["source_date"])
             print("\nSerializing the data frame into the database")
-            db.dataframe_to_table(collection_object.collected_data)
+            csv_file_name = "Outputs_{}.csv".format(collector.today())
+            final_df.to_csv(csv_file_name, index=False)
+            db.dataframe_to_table(final_df)
     except Exception as e:
         print("\nERROR: Encountered exception in: {}".format(e))

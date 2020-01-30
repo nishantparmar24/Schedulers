@@ -48,7 +48,7 @@ def check_equality(df_1, df_2):
         return False
 
 
-def get_columns(database, table):
+def get_columns(database=c.SCHEMA, table=c.TABLE):
     engine = create_engine(engine_auth)
     conn = engine.raw_connection()
     with conn.cursor() as cur:
@@ -91,7 +91,7 @@ def dataframe_to_table(dataframe, table_name=c.TABLE):
             dataframe.to_sql(
                 name=table_name, con=engine_auth, index=False,
                 schema=c.SCHEMA,
-                if_exists="replace")
+                if_exists="append")
         #                    if_exists="append")
         else:
             print("Data already present in table!")
