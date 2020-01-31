@@ -47,8 +47,8 @@ BERT_MODEL = {
     }
 }
 
-USERNAME = "root"
-PASSWORD = "Gradient8#"
+USERNAME = "*****"
+PASSWORD = "*****"
 HOST = "127.0.0.1"
 PORT = "3306"
 SCHEMA = "search_automation"
